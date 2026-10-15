@@ -1,4 +1,4 @@
-FROM php:8.3-cli
+FROM php:8.5-cli
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git unzip libcurl4-openssl-dev libicu-dev libonig-dev libpq-dev libxml2-dev libzip-dev \

@@ -4,7 +4,7 @@ Aplicación con frontend React, API Laravel y SQLite local. Cada producto tiene 
 
 ## Requisitos
 
-- PHP 8.3 o superior con extensiones PDO SQLite, cURL y DOM
+- PHP 8.5 o superior con extensiones PDO SQLite, cURL y DOM
 - Composer
 - Node.js y npm
 - Docker Desktop para ejecutar Maxun
