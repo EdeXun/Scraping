@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Radar",
+    "slug": "radar-tienda",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.edexun.radar",
+      "versionCode": 1,
+      "permissions": []
+    },
+    "extra": {
+      "appUrl": "https://scraping-olive-eta.vercel.app",
+      "eas": {
+        "projectId": "e2ebe290-8e45-4bea-ab3c-fa1af4c9e705"
+      }
+    }
+  }
+}

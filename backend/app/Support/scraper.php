@@ -211,9 +211,39 @@ function sanitize_preview_html(string $html, string $effectiveUrl): string
     foreach (iterator_to_array($xpath->query('//script|//iframe|//frame|//object|//embed|//form|//input|//button|//textarea|//select|//meta[@http-equiv]')) as $node) {
         $node->parentNode?->removeChild($node);
     }
+    // VTEX (used by Elektra) stores its fallback stylesheets inside an inert
+    // <template id="stylesFallback">. Browsers do not load styles from a
+    // template, so promote those links into <head> for the selectable preview.
+    $head = $dom->getElementsByTagName('head')->item(0);
+    if ($head) {
+        $fallbackStylesheets = $xpath->query('//template[@id="stylesFallback"]//link[contains(concat(" ", normalize-space(@rel), " "), " stylesheet ")]');
+        foreach (iterator_to_array($fallbackStylesheets) as $stylesheet) {
+            $stylesheet->removeAttribute('crossorigin');
+            $head->appendChild($stylesheet);
+        }
+    }
+    // Some third-party shadow widgets are serialized as visible text by the
+    // scraper instead of as a <style> element. Remove only that CSS payload.
+    foreach (iterator_to_array($xpath->query('//span[starts-with(normalize-space(.), ":host{--syndiDefaultFontFamily")]')) as $styleText) {
+        $styleText->parentNode?->removeChild($styleText);
+    }
     foreach ($xpath->query('//*[@*]') as $element) {
         if (! $element->hasAttributes()) {
             continue;
+        }
+        if (in_array('vtex-sticky-layout-0-x-wrapper', preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [], true)) {
+            $inlineStyle = $element->getAttribute('style');
+            $inlineStyle = preg_replace('/(^|;)\s*height\s*:[^;]*(;|$)/i', '$1', $inlineStyle) ?: '';
+            $inlineStyle = trim($inlineStyle, " ;\t\n\r\0\x0B");
+            if ($inlineStyle === '') {
+                $element->removeAttribute('style');
+            } else {
+                $element->setAttribute('style', $inlineStyle);
+            }
+        }
+        if (strtolower($element->tagName) === 'link'
+            && preg_match('/(?:^|\s)stylesheet(?:\s|$)/i', $element->getAttribute('rel'))) {
+            $element->removeAttribute('crossorigin');
         }
         foreach (iterator_to_array($element->attributes) as $attribute) {
             $attributeName = strtolower($attribute->name);

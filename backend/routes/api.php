@@ -11,6 +11,54 @@ use App\Services\MaxunScraper;
 Route::middleware('web')->group(function (): void {
     Route::get('/health', fn () => response()->json(['status' => 'ok']));
 
+    Route::post('/internal/import-sqlite', function (Request $request) {
+        $token = (string) env('RADAR_IMPORT_TOKEN', '');
+        if ($token === '' || ! hash_equals($token, (string) $request->bearerToken())) {
+            return response()->json(['error' => 'Not found.'], 404);
+        }
+
+        $data = $request->validate([
+            'users' => ['required', 'array', 'max:100'],
+            'products' => ['required', 'array', 'max:1000'],
+            'product_price_history' => ['required', 'array', 'max:10000'],
+        ]);
+
+        $columns = [
+            'users' => ['id', 'name', 'email', 'password_hash', 'created_at'],
+            'products' => ['id', 'user_id', 'url', 'name', 'price', 'image', 'source', 'interval_minutes', 'created_at', 'last_checked_at', 'next_check_at', 'error', 'maxun_robot_id', 'selectors_json'],
+            'product_price_history' => ['id', 'product_id', 'name', 'price', 'image', 'captured_at'],
+        ];
+
+        $records = [];
+        foreach ($columns as $table => $fields) {
+            $records[$table] = [];
+            foreach ($data[$table] as $record) {
+                if (! is_array($record)) {
+                    return response()->json(['error' => 'Invalid import record.'], 422);
+                }
+                $clean = array_intersect_key($record, array_flip($fields));
+                if (count($clean) !== count($fields)) {
+                    return response()->json(['error' => 'Import record is missing required fields.'], 422);
+                }
+                $records[$table][] = $clean;
+            }
+        }
+
+        if (DB::table('users')->exists() || DB::table('products')->exists() || DB::table('product_price_history')->exists()) {
+            return response()->json(['error' => 'Import is only allowed into an empty catalog.'], 409);
+        }
+
+        DB::transaction(function () use ($records): void {
+            foreach (['users', 'products', 'product_price_history'] as $table) {
+                foreach (array_chunk($records[$table], 100) as $chunk) {
+                    DB::table($table)->insert($chunk);
+                }
+            }
+        });
+
+        return response()->json(['imported' => array_map('count', $records)]);
+    });
+
     Route::post('/auth/register', function (Request $request) {
         $data = $request->validate([
             'name' => ['required', 'string', 'min:2', 'max:120'],
@@ -215,7 +263,7 @@ Route::middleware('web')->group(function (): void {
                 if ($robotId !== ($result['robotId'] ?? $robotId)) {
                     DB::table('products')->where('id', $id)->update(['maxun_robot_id' => $result['robotId']]);
                 }
-                return response()->json(['html' => $result['previewHtml'], 'details' => $result['details']]);
+                return response()->json(['html' => $result['previewHtml'], 'screenshot' => $result['previewScreenshot'] ?? null, 'details' => $result['details']]);
             } catch (\Throwable $error) {
                 return response()->json(['error' => 'No se pudo abrir la vista de revisión: ' . $error->getMessage()], 502);
             }

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Importación temporal de datos</title>
+    <style>
+      body { margin: 0; padding: 2rem; background: #0b1422; color: #e8f0fb; font: 16px system-ui, sans-serif; }
+      main { max-width: 560px; margin: 10vh auto; padding: 2rem; border: 1px solid #263a54; border-radius: 16px; background: #111e30; }
+      h1 { margin-top: 0; font-size: 1.4rem; }
+      label { display: block; margin: 1.25rem 0 .5rem; color: #a9bfdc; }
+      input, button { box-sizing: border-box; width: 100%; padding: .85rem; border: 1px solid #344b68; border-radius: 8px; background: #0b1422; color: inherit; }
+      button { margin-top: 1.4rem; border: 0; background: #176ac1; cursor: pointer; font-weight: 700; }
+      output { display: block; margin-top: 1rem; white-space: pre-wrap; color: #9bc7ff; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Migración temporal del catálogo</h1>
+      <p>Selecciona el archivo JSON exportado desde la base local y usa el token temporal de importación.</p>
+      <form id="import-form">
+        <label for="token">Token temporal</label>
+        <input id="token" type="password" autocomplete="off" required />
+        <label for="file">Exportación SQLite (JSON)</label>
+        <input id="file" type="file" accept="application/json,.json" required />
+        <button type="submit">Importar datos</button>
+      </form>
+      <output id="result" aria-live="polite"></output>
+    </main>
+    <script>
+      const form = document.querySelector('#import-form');
+      const result = document.querySelector('#result');
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        result.textContent = 'Importando…';
+        try {
+          const data = JSON.parse(await document.querySelector('#file').files[0].text());
+          const response = await fetch('/api/internal/import-sqlite', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${document.querySelector('#token').value}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || 'No se pudo importar.');
+          result.textContent = `Importación completada: ${JSON.stringify(payload.imported)}`;
+        } catch (error) {
+          result.textContent = error.message;
+        }
+      });
+    </script>
+  </body>
+</html>
